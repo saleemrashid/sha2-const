@@ -8,3 +8,5 @@ edition = "2018"
 
 [dev-dependencies]
 hex = "0.4.2"
+proptest = "0.9.6"
+sha2 = "0.8.1"
