@@ -1,10 +1,12 @@
 [package]
 name = "sha2-const"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Saleem Rashid <dev@saleemrashid.com>"]
 edition = "2018"
 description = "const fn implementation of the SHA-2 family of hash functions"
+documentation = "https://docs.rs/sha2-const"
 readme = "README.md"
+homepage = "https://github.com/saleemrashid/sha2-const"
 repository = "https://github.com/saleemrashid/sha2-const"
 license = "MIT OR Apache-2.0"
 keywords = ["crypto"]
