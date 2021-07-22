@@ -63,10 +63,9 @@ macro_rules! sha {
                             memcpy(&mut self.buffer, 0, input, i, remain);
                             self.offset = remain;
                             break;
-                        } else {
-                            Self::compress(&mut self.state, input, i);
-                            i += Self::BLOCK_SIZE;
                         }
+                        Self::compress(&mut self.state, input, i);
+                        i += Self::BLOCK_SIZE;
                     }
                 }
 
