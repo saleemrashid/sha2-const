@@ -11,6 +11,7 @@ repository = "https://github.com/saleemrashid/sha2-const"
 license = "MIT OR Apache-2.0"
 keywords = ["crypto"]
 categories = ["cryptography", "no-std"]
+include = ["src/**/*", "README.md"]
 
 [dependencies]
 
