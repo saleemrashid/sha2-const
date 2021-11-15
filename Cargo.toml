@@ -1,6 +1,6 @@
 [package]
 name = "sha2-const"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Saleem Rashid <dev@saleemrashid.com>"]
 edition = "2018"
 description = "const fn implementation of the SHA-2 family of hash functions"
