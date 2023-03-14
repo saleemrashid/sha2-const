@@ -41,7 +41,6 @@
 //!     "6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000"
 //! );
 //! ```
-#![feature(const_mut_refs)]
 #![no_std]
 
 mod constants;
@@ -80,7 +79,7 @@ macro_rules! sha {
             /// Add input data to the hash context.
             #[must_use]
             pub const fn update(mut self, input: &[u8]) -> Self {
-                self.inner.update(&input);
+                self.inner = self.inner.update(&input);
                 self
             }
 
@@ -89,7 +88,7 @@ macro_rules! sha {
             pub const fn finalize(self) -> [u8; Self::DIGEST_SIZE] {
                 let digest = self.inner.finalize();
                 let mut truncated = [0; Self::DIGEST_SIZE];
-                memcpy(&mut truncated, 0, &digest, 0, Self::DIGEST_SIZE);
+                truncated = memcpy(truncated, 0, &digest, 0, Self::DIGEST_SIZE);
                 truncated
             }
         }
