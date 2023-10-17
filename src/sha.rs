@@ -45,56 +45,71 @@ macro_rules! sha {
             }
 
             /// Add input data to the hash context.
-            pub(crate) const fn update(&mut self, input: &[u8]) {
-                let offset = self.offset;
+            pub(crate) const fn update(self, input: &[u8]) -> Self {
+                let Self {
+                    mut state,
+                    mut buffer,
+                    mut offset,
+                    mut length,
+                } = self;
                 let needed = Self::BLOCK_SIZE - offset;
 
                 if needed > input.len() {
-                    memcpy(&mut self.buffer, offset, input, 0, input.len());
-                    self.offset += input.len();
+                    buffer = memcpy(buffer, offset, input, 0, input.len());
+                    offset += input.len();
                 } else {
-                    memcpy(&mut self.buffer, offset, input, 0, needed);
-                    Self::compress(&mut self.state, &self.buffer, 0);
+                    buffer = memcpy(buffer, offset, input, 0, needed);
+                    state = Self::compress(state, &buffer, 0);
 
                     let mut i = needed;
                     loop {
                         let remain = input.len() - i;
                         if remain < Self::BLOCK_SIZE {
-                            memcpy(&mut self.buffer, 0, input, i, remain);
-                            self.offset = remain;
+                            buffer = memcpy(buffer, 0, input, i, remain);
+                            offset = remain;
                             break;
                         } else {
-                            Self::compress(&mut self.state, input, i);
+                            state = Self::compress(state, input, i);
                             i += Self::BLOCK_SIZE;
                         }
                     }
                 }
 
-                self.length += (input.len() as $length) * 8;
+                length += (input.len() as $length) * 8;
+                Self {
+                    state,
+                    buffer,
+                    offset,
+                    length,
+                }
             }
 
-            pub(crate) const fn finalize(mut self) -> [u8; Self::DIGEST_SIZE] {
-                let mut offset = self.offset;
-                self.buffer[offset] = 0x80;
+            pub(crate) const fn finalize(self) -> [u8; Self::DIGEST_SIZE] {
+                let Self {
+                    mut state,
+                    mut buffer,
+                    mut offset,
+                    length,
+                } = self;
+                buffer[offset] = 0x80;
                 offset += 1;
 
                 if offset > Self::LENGTH_OFFSET {
-                    memset(&mut self.buffer, offset, 0, Self::BLOCK_SIZE - offset);
-                    Self::compress(&mut self.state, &self.buffer, 0);
+                    buffer = memset(buffer, offset, 0, Self::BLOCK_SIZE - offset);
+                    state = Self::compress(state, &buffer, 0);
                     offset = 0;
                 }
 
-                memset(&mut self.buffer, offset, 0, Self::LENGTH_OFFSET - offset);
-                $store_length(&mut self.buffer, Self::LENGTH_OFFSET, self.length);
-                Self::compress(&mut self.state, &self.buffer, 0);
+                buffer = memset(buffer, offset, 0, Self::LENGTH_OFFSET - offset);
+                buffer = $store_length(buffer, Self::LENGTH_OFFSET, length);
+                state = Self::compress(state, &buffer, 0);
 
                 let mut digest = [0; Self::DIGEST_SIZE];
                 let mut i = 0;
-                while i < self.state.len() {
-                    $store_word(&mut digest, i * Self::WORD_SIZE, self.state[i]);
+                while i < state.len() {
+                    digest = $store_word(digest, i * Self::WORD_SIZE, state[i]);
                     i += 1
                 }
-
                 digest
             }
 
@@ -102,7 +117,7 @@ macro_rules! sha {
             ///
             /// This function takes an `offset` because subslices are not supported in
             /// `const fn`.
-            const fn compress(state: &mut [$word; 8], buffer: &[u8], offset: usize) {
+            const fn compress(mut state: [$word; 8], buffer: &[u8], offset: usize) -> [$word; 8] {
                 #[inline(always)]
                 const fn ch(x: $word, y: $word, z: $word) -> $word {
                     (x & y) ^ ((!x) & z)
@@ -181,6 +196,8 @@ macro_rules! sha {
                 state[5] = state[5].wrapping_add(f);
                 state[6] = state[6].wrapping_add(g);
                 state[7] = state[7].wrapping_add(h);
+
+                state
             }
         }
     };
