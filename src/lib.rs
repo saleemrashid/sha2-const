@@ -41,7 +41,6 @@
 //!     "6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000"
 //! );
 //! ```
-#![feature(const_mut_refs)]
 #![no_std]
 
 mod constants;
