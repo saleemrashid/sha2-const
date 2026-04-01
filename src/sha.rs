@@ -5,22 +5,29 @@ use crate::{
 use core::mem;
 
 macro_rules! sha {
-    ($name:ident, $word:ty, $k:ident, $length:ty, $bsig0:tt, $bsig1:tt, $ssig0:tt, $ssig1:tt) => {
+    (
+        $name:ident,
+        $word:ty,
+        $k:expr,
+        $length:ty,
+        $bsig0:expr,
+        $bsig1:expr,
+        $ssig0:expr,
+        $ssig1:expr
+    ) => {
         #[derive(Copy, Clone)]
         pub(crate) struct $name {
             state: [$word; 8],
-            buffer: [u8; 16 * mem::size_of::<$word>()],
+            buffer: [u8; Self::BLOCK_SIZE],
             offset: usize,
             length: $length,
         }
 
         impl $name {
             /// The internal block size of the hash function.
-            pub(crate) const BLOCK_SIZE: usize = 16 * Self::WORD_SIZE;
-            const DIGEST_SIZE: usize = 8 * Self::WORD_SIZE;
-            const LENGTH_OFFSET: usize = Self::BLOCK_SIZE - Self::LENGTH_SIZE;
-            const LENGTH_SIZE: usize = mem::size_of::<$length>();
-            const WORD_SIZE: usize = mem::size_of::<$word>();
+            pub(crate) const BLOCK_SIZE: usize = 16 * mem::size_of::<$word>();
+            /// The digest size of the hash function.
+            const DIGEST_SIZE: usize = 8 * mem::size_of::<$word>();
 
             /// Construct a new instance.
             pub(crate) const fn new(state: [$word; 8]) -> Self {
@@ -60,28 +67,36 @@ macro_rules! sha {
             }
 
             pub(crate) const fn finalize(mut self) -> [u8; Self::DIGEST_SIZE] {
-                let mut offset = self.offset;
+                let Some((first, remainder)) =
+                    idx!(&mut self.buffer[self.offset..]).split_first_mut()
+                else {
+                    // The buffer cannot be full
+                    unreachable!()
+                };
                 // Append bit "1"
-                self.buffer[offset] = 0x80;
-                offset += 1;
+                *first = 0x80;
 
-                if offset > Self::LENGTH_OFFSET {
-                    let padding = idx!(&mut self.buffer[offset..]);
-                    memset(padding, 0);
+                let remainder = if remainder.len() < mem::size_of_val(&self.length) {
+                    memset(remainder, 0);
                     Self::compress(&mut self.state, &self.buffer);
-                    offset = 0;
-                }
+                    // New block
+                    &mut self.buffer
+                } else {
+                    remainder
+                };
 
-                let padding = idx!(&mut self.buffer[offset..Self::LENGTH_OFFSET]);
+                let Some((padding, length)) = remainder.split_last_chunk_mut() else {
+                    // Length will fit in remainder, as long as length fits in a block
+                    unreachable!()
+                };
                 memset(padding, 0);
                 // Append length to end of block
-                let length = idx!(&mut self.buffer[Self::LENGTH_OFFSET..]);
-                length.copy_from_slice(idx!(&self.length.to_be_bytes()[..]));
-
+                *length = self.length.to_be_bytes();
                 Self::compress(&mut self.state, &self.buffer);
 
                 let mut digest = [0; Self::DIGEST_SIZE];
                 let (dest, []) = digest.as_chunks_mut() else {
+                    // Digest is the same size as state
                     unreachable!()
                 };
 
