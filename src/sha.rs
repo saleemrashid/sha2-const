@@ -1,24 +1,12 @@
 use crate::{
     constants::{K256, K512},
-    util::{load_u32_be, load_u64_be, memcpy, memset, store_u128_be, store_u32_be, store_u64_be},
+    util::{idx, memset},
 };
 use core::mem;
 
 macro_rules! sha {
-    (
-        $name:ident,
-        $word:ty,
-        $load_word:ident,
-        $store_word:ident,
-        $k:ident,
-        $length:ty,
-        $store_length:ident,
-        $bsig0:tt,
-        $bsig1:tt,
-        $ssig0:tt,
-        $ssig1:tt
-    ) => {
-        #[derive(Clone)]
+    ($name:ident, $word:ty, $k:ident, $length:ty, $bsig0:tt, $bsig1:tt, $ssig0:tt, $ssig1:tt) => {
+        #[derive(Copy, Clone)]
         pub(crate) struct $name {
             state: [$word; 8],
             buffer: [u8; 16 * mem::size_of::<$word>()],
@@ -46,28 +34,26 @@ macro_rules! sha {
 
             /// Add input data to the hash context.
             pub(crate) const fn update(&mut self, input: &[u8]) {
-                let offset = self.offset;
-                let needed = Self::BLOCK_SIZE - offset;
+                let needed = idx!(&mut self.buffer[self.offset..]);
 
-                if needed > input.len() {
-                    memcpy(&mut self.buffer, offset, input, 0, input.len());
+                if needed.len() > input.len() {
+                    idx!(&mut needed[..input.len()]).copy_from_slice(input);
                     self.offset += input.len();
                 } else {
-                    memcpy(&mut self.buffer, offset, input, 0, needed);
-                    Self::compress(&mut self.state, &self.buffer, 0);
+                    let (partial, remainder) = input.split_at(needed.len());
+                    needed.copy_from_slice(partial);
+                    Self::compress(&mut self.state, &self.buffer);
 
-                    let mut i = needed;
-                    loop {
-                        let remain = input.len() - i;
-                        if remain < Self::BLOCK_SIZE {
-                            memcpy(&mut self.buffer, 0, input, i, remain);
-                            self.offset = remain;
-                            break;
-                        } else {
-                            Self::compress(&mut self.state, input, i);
-                            i += Self::BLOCK_SIZE;
-                        }
+                    let (blocks, remainder) = remainder.as_chunks();
+
+                    let mut i = 0;
+                    while i < blocks.len() {
+                        Self::compress(&mut self.state, &blocks[i]);
+                        i += 1
                     }
+
+                    idx!(&mut self.buffer[..remainder.len()]).copy_from_slice(remainder);
+                    self.offset = remainder.len();
                 }
 
                 self.length += (input.len() as $length) * 8;
@@ -75,23 +61,33 @@ macro_rules! sha {
 
             pub(crate) const fn finalize(mut self) -> [u8; Self::DIGEST_SIZE] {
                 let mut offset = self.offset;
+                // Append bit "1"
                 self.buffer[offset] = 0x80;
                 offset += 1;
 
                 if offset > Self::LENGTH_OFFSET {
-                    memset(&mut self.buffer, offset, 0, Self::BLOCK_SIZE - offset);
-                    Self::compress(&mut self.state, &self.buffer, 0);
+                    let padding = idx!(&mut self.buffer[offset..]);
+                    memset(padding, 0);
+                    Self::compress(&mut self.state, &self.buffer);
                     offset = 0;
                 }
 
-                memset(&mut self.buffer, offset, 0, Self::LENGTH_OFFSET - offset);
-                $store_length(&mut self.buffer, Self::LENGTH_OFFSET, self.length);
-                Self::compress(&mut self.state, &self.buffer, 0);
+                let padding = idx!(&mut self.buffer[offset..Self::LENGTH_OFFSET]);
+                memset(padding, 0);
+                // Append length to end of block
+                let length = idx!(&mut self.buffer[Self::LENGTH_OFFSET..]);
+                length.copy_from_slice(idx!(&self.length.to_be_bytes()[..]));
+
+                Self::compress(&mut self.state, &self.buffer);
 
                 let mut digest = [0; Self::DIGEST_SIZE];
+                let (dest, []) = digest.as_chunks_mut() else {
+                    unreachable!()
+                };
+
                 let mut i = 0;
                 while i < self.state.len() {
-                    $store_word(&mut digest, i * Self::WORD_SIZE, self.state[i]);
+                    dest[i] = self.state[i].to_be_bytes();
                     i += 1
                 }
 
@@ -99,10 +95,7 @@ macro_rules! sha {
             }
 
             /// SHA compression function.
-            ///
-            /// This function takes an `offset` because subslices are not supported in
-            /// `const fn`.
-            const fn compress(state: &mut [$word; 8], buffer: &[u8], offset: usize) {
+            const fn compress(state: &mut [$word; 8], block: &[u8; Self::BLOCK_SIZE]) {
                 #[inline(always)]
                 const fn ch(x: $word, y: $word, z: $word) -> $word {
                     (x & y) ^ ((!x) & z)
@@ -129,10 +122,13 @@ macro_rules! sha {
                 }
 
                 let mut w: [$word; $k.len()] = [0; $k.len()];
+                let (src, []) = block.as_chunks() else {
+                    unreachable!()
+                };
 
                 let mut i = 0;
                 while i < 16 {
-                    w[i] = $load_word(buffer, offset + i * mem::size_of::<$word>());
+                    w[i] = <$word>::from_be_bytes(src[i]);
                     i += 1;
                 }
                 while i < $k.len() {
@@ -189,11 +185,8 @@ macro_rules! sha {
 sha!(
     Sha256,
     u32,
-    load_u32_be,
-    store_u32_be,
     K256,
     u64,
-    store_u64_be,
     (2, 13, 22),
     (6, 11, 25),
     (7, 18, 3),
@@ -203,11 +196,8 @@ sha!(
 sha!(
     Sha512,
     u64,
-    load_u64_be,
-    store_u64_be,
     K512,
     u128,
-    store_u128_be,
     (28, 34, 39),
     (14, 18, 41),
     (1, 8, 7),

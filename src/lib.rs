@@ -48,7 +48,6 @@ mod sha;
 mod util;
 
 use constants::{H224, H256, H384, H512, H512_224, H512_256};
-use util::memcpy;
 
 macro_rules! sha {
     (
@@ -58,7 +57,7 @@ macro_rules! sha {
         $iv:ident
     ) => {
         $(#[$doc])*
-        #[derive(Clone)]
+        #[derive(Copy, Clone)]
         pub struct $name {
             inner: $inner,
         }
@@ -87,9 +86,10 @@ macro_rules! sha {
             #[must_use]
             pub const fn finalize(self) -> [u8; Self::DIGEST_SIZE] {
                 let digest = self.inner.finalize();
-                let mut truncated = [0; Self::DIGEST_SIZE];
-                memcpy(&mut truncated, 0, &digest, 0, Self::DIGEST_SIZE);
-                truncated
+                let Some(truncated) = digest.first_chunk() else {
+                    unreachable!()
+                };
+                *truncated
             }
         }
     };

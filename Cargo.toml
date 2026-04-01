@@ -2,7 +2,7 @@
 name = "sha2-const"
 version = "0.1.2"
 authors = ["Saleem Rashid <dev@saleemrashid.com>"]
-edition = "2018"
+edition = "2024"
 description = "const fn implementation of the SHA-2 family of hash functions"
 documentation = "https://docs.rs/sha2-const"
 readme = "README.md"

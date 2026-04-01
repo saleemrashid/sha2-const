@@ -1,93 +1,107 @@
-/// Copies `n` bytes from `src` (starting at `src_offset`) to `dest` (starting
-/// at `dest_offset`).
-///
-/// The source and destination must _not_ overlap. This function exists because
-/// subslices are not supported in `const fn`.
-#[inline(always)]
-pub(crate) const fn memcpy(
-    dest: &mut [u8],
-    dest_offset: usize,
-    src: &[u8],
-    src_offset: usize,
-    n: usize,
-) {
-    let mut i = 0;
-    while i < n {
-        dest[dest_offset + i] = src[src_offset + i];
-        i += 1;
+use core::ops::{Range, RangeFrom, RangeFull, RangeTo};
+
+pub(crate) struct __ConstSliceIndex<I>(pub(crate) I);
+
+#[allow(dead_code)]
+impl __ConstSliceIndex<Range<usize>> {
+    #[inline]
+    pub(crate) const fn index<'a, T>(&self, slice: &'a [T]) -> &'a [T] {
+        let (slice, _) = slice.split_at(self.0.end);
+        let (_, slice) = slice.split_at(self.0.start);
+        slice
+    }
+
+    #[inline]
+    pub(crate) const fn index_mut<'a, T>(&self, slice: &'a mut [T]) -> &'a mut [T] {
+        let (slice, _) = slice.split_at_mut(self.0.end);
+        let (_, slice) = slice.split_at_mut(self.0.start);
+        slice
     }
 }
 
-/// Sets `n` bytes in `dest` (starting at `dest_offset`) to `val`.
-///
-/// This function exists because subslices are not supported in `const fn`.
-#[inline(always)]
-pub(crate) const fn memset(dest: &mut [u8], offset: usize, val: u8, n: usize) {
-    let mut i = 0;
-    while i < n {
-        dest[offset + i] = val;
-        i += 1;
+#[allow(dead_code)]
+impl __ConstSliceIndex<RangeFrom<usize>> {
+    #[inline]
+    pub(crate) const fn index<'a, T>(&self, slice: &'a [T]) -> &'a [T] {
+        let (_, slice) = slice.split_at(self.0.start);
+        slice
+    }
+
+    #[inline]
+    pub(crate) const fn index_mut<'a, T>(&self, slice: &'a mut [T]) -> &'a mut [T] {
+        let (_, slice) = slice.split_at_mut(self.0.start);
+        slice
     }
 }
 
-/// Loads an unsigned 32-bit big endian integer from `src` (starting at
-/// `offset`).
-///
-/// This function exists because subslices are not supported in `const fn`.
-#[inline(always)]
-pub(crate) const fn load_u32_be(src: &[u8], offset: usize) -> u32 {
-    u32::from_be_bytes([
-        src[offset],
-        src[offset + 1],
-        src[offset + 2],
-        src[offset + 3],
-    ])
+#[allow(dead_code)]
+impl __ConstSliceIndex<RangeTo<usize>> {
+    #[inline]
+    pub(crate) const fn index<'a, T>(&self, slice: &'a [T]) -> &'a [T] {
+        let (slice, _) = slice.split_at(self.0.end);
+        slice
+    }
+
+    #[inline]
+    pub(crate) const fn index_mut<'a, T>(&self, slice: &'a mut [T]) -> &'a mut [T] {
+        let (slice, _) = slice.split_at_mut(self.0.end);
+        slice
+    }
 }
 
-/// Loads an unsigned 64-bit big endian integer from `src` (starting at
-/// `offset`).
-///
-/// This function exists because subslices are not supported in `const fn`.
-#[inline(always)]
-pub(crate) const fn load_u64_be(src: &[u8], offset: usize) -> u64 {
-    u64::from_be_bytes([
-        src[offset],
-        src[offset + 1],
-        src[offset + 2],
-        src[offset + 3],
-        src[offset + 4],
-        src[offset + 5],
-        src[offset + 6],
-        src[offset + 7],
-    ])
+#[allow(dead_code)]
+#[allow(clippy::unused_self)]
+impl __ConstSliceIndex<RangeFull> {
+    #[inline]
+    pub(crate) const fn index<'a, T>(&self, slice: &'a [T]) -> &'a [T] {
+        slice
+    }
+
+    #[inline]
+    pub(crate) const fn index_mut<'a, T>(&self, slice: &'a mut [T]) -> &'a mut [T] {
+        slice
+    }
 }
 
-/// Stores an unsigned 32-bit big endian integer into `dest` (starting at
-/// `offset`).
-///
-/// This function exists because subslices are not supported in `const fn`.
-#[inline(always)]
-pub(crate) const fn store_u32_be(dest: &mut [u8], offset: usize, n: u32) {
-    let bytes = u32::to_be_bytes(n);
-    memcpy(dest, offset, &bytes, 0, bytes.len());
+macro_rules! idx_inner {
+    (@accum $mut:ident; ($($slice:tt)*) [ $index:expr ]) => {
+        $crate::util::idx_inner!(@emit $mut; ($($slice)*), $index)
+    };
+    (@accum $mut:ident; ($($slice:tt)*) $next:tt $($tail:tt)+) => {
+        $crate::util::idx_inner!(@accum $mut; ($($slice)* $next) $($tail)+)
+    };
+    (@emit ref; $slice:expr, $index:expr) => {
+        // Use split_at as an identity function, to force autoref to &[T]
+        $crate::util::__ConstSliceIndex($index).index($slice.split_at(0).1)
+    };
+    (@emit mut; $slice:expr, $index:expr) => {
+        // Use split_at_mut as an identity function, to force autoref to &mut [T]
+        $crate::util::__ConstSliceIndex($index).index_mut($slice.split_at_mut(0).1)
+    };
 }
 
-/// Stores an unsigned 64-bit big endian integer into `dest` (starting at
-/// `offset`).
-///
-/// This function exists because subslices are not supported in `const fn`.
-#[inline(always)]
-pub(crate) const fn store_u64_be(dest: &mut [u8], offset: usize, n: u64) {
-    let bytes = u64::to_be_bytes(n);
-    memcpy(dest, offset, &bytes, 0, bytes.len());
+pub(crate) use idx_inner;
+
+/// Implements `Index` and `IndexMut` syntax for slices in `const fn`.
+macro_rules! idx {
+    (&mut $($tt:tt)*) => {
+        $crate::util::idx_inner!(@accum mut; () $($tt)*)
+    };
+    (&$($tt:tt)*) => {
+        $crate::util::idx_inner!(@accum ref; () $($tt)*)
+    };
 }
 
-/// Stores an unsigned 128-bit big endian integer into `dest` (starting at
-/// `offset`).
+pub(crate) use idx;
+
+/// Fills `dest` with `val`.
 ///
-/// This function exists because subslices are not supported in `const fn`.
-#[inline(always)]
-pub(crate) const fn store_u128_be(dest: &mut [u8], offset: usize, n: u128) {
-    let bytes = u128::to_be_bytes(n);
-    memcpy(dest, offset, &bytes, 0, bytes.len());
+/// This function exists because `slice::fill` is not `const fn`.
+#[inline]
+pub(crate) const fn memset(dest: &mut [u8], val: u8) {
+    let mut i = 0;
+    while i < dest.len() {
+        dest[i] = val;
+        i += 1;
+    }
 }

@@ -19,7 +19,7 @@ impl TestFile {
 
     fn consume(&mut self, name: &str) -> Option<&'static str> {
         self.read_line().map(|s| {
-            let prefix = format!("{} = ", name);
+            let prefix = format!("{name} = ");
             assert!(s.starts_with(&prefix), "unexpected line");
             &s[prefix.len()..]
         })
