@@ -69,6 +69,7 @@ macro_rules! sha {
             pub const DIGEST_SIZE: usize = $size;
 
             /// Construct a new instance.
+            #[expect(clippy::new_without_default)]
             pub const fn new() -> Self {
                 Self {
                     inner: <$inner>::new($iv),
