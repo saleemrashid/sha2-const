@@ -1,7 +1,7 @@
 # sha2-const
 
 [![Build status](https://github.com/saleemrashid/sha2-const/workflows/CI/badge.svg)](https://github.com/saleemrashid/sha2-const/actions)
-[![Crate](https://meritbadge.herokuapp.com/sha2-const)](https://crates.io/crates/sha2-const)
+[![Crate](https://img.shields.io/crates/v/sha2-const)](https://crates.io/crates/sha2-const)
 [![Documentation](https://docs.rs/sha2-const/badge.svg)](https://docs.rs/sha2-const)
 
 `const fn` implementation of the SHA-2 family of hash functions.
