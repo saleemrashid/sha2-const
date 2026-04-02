@@ -1,6 +1,6 @@
 use crate::{
     constants::{K256, K512},
-    util::{array_as_chunks, array_as_chunks_mut, array_split_last_chunk_mut, idx, memset},
+    util::{array_as_chunks, array_as_chunks_mut, array_rsplit_array_mut, idx, slice_fill},
 };
 use core::mem;
 
@@ -78,14 +78,14 @@ macro_rules! sha {
                     // Length will be in the current block
                     Some(pair) => pair,
                     None => {
-                        memset(unfilled, 0);
+                        slice_fill(unfilled, 0);
                         Self::compress(&mut self.state, &self.buffer);
                         // Length will be in a new block
-                        array_split_last_chunk_mut(&mut self.buffer)
+                        array_rsplit_array_mut(&mut self.buffer)
                     },
                 };
 
-                memset(padding, 0);
+                slice_fill(padding, 0);
                 // Append length to end of block
                 *length = self.length.to_be_bytes();
                 Self::compress(&mut self.state, &self.buffer);

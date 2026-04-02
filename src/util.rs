@@ -94,14 +94,14 @@ macro_rules! idx {
 
 pub(crate) use idx;
 
-/// Fills `dest` with `val`.
+/// Fills `slice` with `value`.
 ///
 /// This function exists because `slice::fill` is not `const fn`.
 #[inline]
-pub(crate) const fn memset(dest: &mut [u8], val: u8) {
+pub(crate) const fn slice_fill<T: Copy>(slice: &mut [T], value: T) {
     let mut i = 0;
-    while i < dest.len() {
-        dest[i] = val;
+    while i < slice.len() {
+        slice[i] = value;
         i += 1;
     }
 }
@@ -138,10 +138,11 @@ pub(crate) const fn array_as_chunks_mut<T, const N: usize, const D: usize, const
     (chunks, remainder)
 }
 
-/// Returns a mutable array reference to the last `M` items in the array and the
-/// remaining slice.
+/// Divides one mutable array reference into two at an index from the end.
+///
+/// This functions exists because `array::rsplit_array_mut` is not stable.
 #[inline]
-pub(crate) const fn array_split_last_chunk_mut<T, const N: usize, const M: usize>(
+pub(crate) const fn array_rsplit_array_mut<T, const N: usize, const M: usize>(
     array: &mut [T; N],
 ) -> (&mut [T], &mut [T; M]) {
     const {
