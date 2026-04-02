@@ -34,5 +34,5 @@ tests!(sha224, sha2_const::Sha224, sha2::Sha224);
 tests!(sha256, sha2_const::Sha256, sha2::Sha256);
 tests!(sha384, sha2_const::Sha384, sha2::Sha384);
 tests!(sha512, sha2_const::Sha512, sha2::Sha512);
-tests!(sha512_224, sha2_const::Sha512_224, sha2::Sha512Trunc224);
-tests!(sha512_256, sha2_const::Sha512_256, sha2::Sha512Trunc256);
+tests!(sha512_224, sha2_const::Sha512_224, sha2::Sha512_224);
+tests!(sha512_256, sha2_const::Sha512_256, sha2::Sha512_256);
