@@ -1,6 +1,6 @@
 use crate::{
     constants::{K256, K512},
-    util::{idx, memset},
+    util::{array_as_chunks, array_as_chunks_mut, idx, memset},
 };
 use core::mem;
 
@@ -95,10 +95,7 @@ macro_rules! sha {
                 Self::compress(&mut self.state, &self.buffer);
 
                 let mut digest = [0; Self::DIGEST_SIZE];
-                let (dest, []) = digest.as_chunks_mut() else {
-                    // Digest is the same size as state
-                    unreachable!()
-                };
+                let (dest, []) = array_as_chunks_mut(&mut digest);
 
                 let mut i = 0;
                 while i < self.state.len() {
@@ -136,10 +133,8 @@ macro_rules! sha {
                     x.rotate_right($ssig1.0) ^ x.rotate_right($ssig1.1) ^ (x >> $ssig1.2)
                 }
 
-                let mut w: [$word; $k.len()] = [0; $k.len()];
-                let (src, []) = block.as_chunks() else {
-                    unreachable!()
-                };
+                let mut w = [0; $k.len()];
+                let (src, []) = array_as_chunks(block);
 
                 let mut i = 0;
                 while i < 16 {

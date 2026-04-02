@@ -105,3 +105,35 @@ pub(crate) const fn memset(dest: &mut [u8], val: u8) {
         i += 1;
     }
 }
+
+/// Splits the array into a slice of `D`-element arrays, starting at the
+/// beginning of the array, and a remainder `R`-element array.
+#[inline]
+pub(crate) const fn array_as_chunks<T, const N: usize, const D: usize, const R: usize>(
+    array: &[T; N],
+) -> (&[[T; D]], &[T; R]) {
+    const {
+        assert!(N % D == R);
+    };
+    let (chunks, remainder) = array.as_chunks();
+    let Some(remainder) = remainder.as_array() else {
+        unreachable!()
+    };
+    (chunks, remainder)
+}
+
+/// Splits the array into a slice of `D`-element arrays, starting at the
+/// beginning of the array, and a remainder `R`-element array.
+#[inline]
+pub(crate) const fn array_as_chunks_mut<T, const N: usize, const D: usize, const R: usize>(
+    array: &mut [T; N],
+) -> (&mut [[T; D]], &mut [T; R]) {
+    const {
+        assert!(N % D == R);
+    };
+    let (chunks, remainder) = array.as_chunks_mut();
+    let Some(remainder) = remainder.as_mut_array() else {
+        unreachable!()
+    };
+    (chunks, remainder)
+}
