@@ -112,14 +112,12 @@ pub(crate) const fn slice_fill<T: Copy>(slice: &mut [T], value: T) {
 pub(crate) const fn array_as_chunks<T, const N: usize, const D: usize, const R: usize>(
     array: &[T; N],
 ) -> (&[[T; D]], &[T; R]) {
-    const {
-        assert!(N % D == R);
-    };
-    let (chunks, remainder) = array.as_chunks();
-    let Some(remainder) = remainder.as_array() else {
+    const { assert!(N % D == R) };
+    let (init, tail) = array_rsplit_array_ref(array);
+    let (chunks, []) = init.as_chunks() else {
         unreachable!()
     };
-    (chunks, remainder)
+    (chunks, tail)
 }
 
 /// Splits the array into a slice of `D`-element arrays, starting at the
@@ -128,14 +126,26 @@ pub(crate) const fn array_as_chunks<T, const N: usize, const D: usize, const R: 
 pub(crate) const fn array_as_chunks_mut<T, const N: usize, const D: usize, const R: usize>(
     array: &mut [T; N],
 ) -> (&mut [[T; D]], &mut [T; R]) {
-    const {
-        assert!(N % D == R);
-    };
-    let (chunks, remainder) = array.as_chunks_mut();
-    let Some(remainder) = remainder.as_mut_array() else {
+    const { assert!(N % D == R) };
+    let (init, tail) = array_rsplit_array_mut(array);
+    let (chunks, []) = init.as_chunks_mut() else {
         unreachable!()
     };
-    (chunks, remainder)
+    (chunks, tail)
+}
+
+/// Divides one array reference into two at an index from the end.
+///
+/// This functions exists because `array::rsplit_array_ref` is not stable.
+#[inline]
+pub(crate) const fn array_rsplit_array_ref<T, const N: usize, const M: usize>(
+    array: &[T; N],
+) -> (&[T], &[T; M]) {
+    const { assert!(M <= N) };
+    let Some((init, tail)) = array.split_last_chunk() else {
+        unreachable!()
+    };
+    (init, tail)
 }
 
 /// Divides one mutable array reference into two at an index from the end.
@@ -145,11 +155,9 @@ pub(crate) const fn array_as_chunks_mut<T, const N: usize, const D: usize, const
 pub(crate) const fn array_rsplit_array_mut<T, const N: usize, const M: usize>(
     array: &mut [T; N],
 ) -> (&mut [T], &mut [T; M]) {
-    const {
-        assert!(M <= N);
-    };
+    const { assert!(M <= N) };
     let Some((init, tail)) = array.split_last_chunk_mut() else {
-        unreachable!();
+        unreachable!()
     };
     (init, tail)
 }

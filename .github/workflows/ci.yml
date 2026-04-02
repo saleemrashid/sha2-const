@@ -26,6 +26,7 @@ jobs:
           - aarch64-unknown-none
           - thumbv7m-none-eabi
         toolchain:
+          - 1.88
           - stable
           - nightly
     runs-on: ubuntu-latest
@@ -40,6 +41,7 @@ jobs:
     strategy:
       matrix:
         toolchain:
+          - 1.88
           - stable
           - nightly
     runs-on: ubuntu-latest
