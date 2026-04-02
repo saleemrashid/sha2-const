@@ -1,6 +1,6 @@
 use crate::{
     constants::{K256, K512},
-    util::{array_as_chunks, array_as_chunks_mut, idx, memset},
+    util::{array_as_chunks, array_as_chunks_mut, array_split_last_chunk_mut, idx, memset},
 };
 use core::mem;
 
@@ -41,17 +41,16 @@ macro_rules! sha {
 
             /// Add input data to the hash context.
             pub(crate) const fn update(&mut self, input: &[u8]) {
-                let needed = idx!(&mut self.buffer[self.offset..]);
-
-                if needed.len() > input.len() {
-                    idx!(&mut needed[..input.len()]).copy_from_slice(input);
+                let unfilled = idx!(&mut self.buffer[self.offset..]);
+                if unfilled.len() > input.len() {
+                    idx!(&mut unfilled[..input.len()]).copy_from_slice(input);
                     self.offset += input.len();
                 } else {
-                    let (partial, remainder) = input.split_at(needed.len());
-                    needed.copy_from_slice(partial);
+                    let (partial, remaining) = input.split_at(unfilled.len());
+                    unfilled.copy_from_slice(partial);
                     Self::compress(&mut self.state, &self.buffer);
 
-                    let (blocks, remainder) = remainder.as_chunks();
+                    let (blocks, remaining) = remaining.as_chunks();
 
                     let mut i = 0;
                     while i < blocks.len() {
@@ -59,36 +58,33 @@ macro_rules! sha {
                         i += 1
                     }
 
-                    idx!(&mut self.buffer[..remainder.len()]).copy_from_slice(remainder);
-                    self.offset = remainder.len();
+                    idx!(&mut self.buffer[..remaining.len()]).copy_from_slice(remaining);
+                    self.offset = remaining.len();
                 }
 
                 self.length += (input.len() as $length) * 8;
             }
 
             pub(crate) const fn finalize(mut self) -> [u8; Self::DIGEST_SIZE] {
-                let Some((first, remainder)) =
-                    idx!(&mut self.buffer[self.offset..]).split_first_mut()
-                else {
+                let unfilled = idx!(&mut self.buffer[self.offset..]);
+                let Some((first, unfilled)) = unfilled.split_first_mut() else {
                     // The buffer cannot be full
                     unreachable!()
                 };
                 // Append bit "1"
                 *first = 0x80;
 
-                let remainder = if remainder.len() < mem::size_of_val(&self.length) {
-                    memset(remainder, 0);
-                    Self::compress(&mut self.state, &self.buffer);
-                    // New block
-                    &mut self.buffer
-                } else {
-                    remainder
+                let (padding, length) = match unfilled.split_last_chunk_mut() {
+                    // Length will be in the current block
+                    Some(pair) => pair,
+                    None => {
+                        memset(unfilled, 0);
+                        Self::compress(&mut self.state, &self.buffer);
+                        // Length will be in a new block
+                        array_split_last_chunk_mut(&mut self.buffer)
+                    },
                 };
 
-                let Some((padding, length)) = remainder.split_last_chunk_mut() else {
-                    // Length will fit in remainder, as long as length fits in a block
-                    unreachable!()
-                };
                 memset(padding, 0);
                 // Append length to end of block
                 *length = self.length.to_be_bytes();
@@ -149,14 +145,7 @@ macro_rules! sha {
                     i += 1;
                 }
 
-                let mut a = state[0];
-                let mut b = state[1];
-                let mut c = state[2];
-                let mut d = state[3];
-                let mut e = state[4];
-                let mut f = state[5];
-                let mut g = state[6];
-                let mut h = state[7];
+                let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut h] = *state;
 
                 let mut i = 0;
                 while i < $k.len() {
@@ -179,14 +168,16 @@ macro_rules! sha {
                     i += 1;
                 }
 
-                state[0] = state[0].wrapping_add(a);
-                state[1] = state[1].wrapping_add(b);
-                state[2] = state[2].wrapping_add(c);
-                state[3] = state[3].wrapping_add(d);
-                state[4] = state[4].wrapping_add(e);
-                state[5] = state[5].wrapping_add(f);
-                state[6] = state[6].wrapping_add(g);
-                state[7] = state[7].wrapping_add(h);
+                *state = [
+                    state[0].wrapping_add(a),
+                    state[1].wrapping_add(b),
+                    state[2].wrapping_add(c),
+                    state[3].wrapping_add(d),
+                    state[4].wrapping_add(e),
+                    state[5].wrapping_add(f),
+                    state[6].wrapping_add(g),
+                    state[7].wrapping_add(h),
+                ]
             }
         }
     };

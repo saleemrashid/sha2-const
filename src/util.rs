@@ -137,3 +137,18 @@ pub(crate) const fn array_as_chunks_mut<T, const N: usize, const D: usize, const
     };
     (chunks, remainder)
 }
+
+/// Returns a mutable array reference to the last `M` items in the array and the
+/// remaining slice.
+#[inline]
+pub(crate) const fn array_split_last_chunk_mut<T, const N: usize, const M: usize>(
+    array: &mut [T; N],
+) -> (&mut [T], &mut [T; M]) {
+    const {
+        assert!(M <= N);
+    };
+    let Some((init, tail)) = array.split_last_chunk_mut() else {
+        unreachable!();
+    };
+    (init, tail)
+}
